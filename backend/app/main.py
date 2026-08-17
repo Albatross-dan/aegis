@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db.session import get_db
 from app.core.logging_config import logger
+from app.models.schemas import TickIn
+from app.models.market_data import MarketTick
 
 app = FastAPI(
     title="AEGIS - Artificial Financial Intelligence Platform",
@@ -46,3 +48,18 @@ def health_check(db: Session = Depends(get_db)):
         "status": "healthy" if db_status == "connected" else "degraded",
         "database": db_status,
     }
+
+@app.post("/api/v1/ticks")
+def ingest_tick(tick: TickIn, db: Session = Depends(get_db)):
+    db_tick = MarketTick(
+        symbol=tick.symbol,
+        broker_symbol=tick.broker_symbol,
+        bid=tick.bid,
+        ask=tick.ask,
+        timestamp=tick.timestamp,
+        source=tick.source,
+    )
+    db.add(db_tick)
+    db.commit()
+    logger.info(f"Ingested tick: {tick.symbol} bid={tick.bid} ask={tick.ask}")
+    return {"status": "stored", "symbol": tick.symbol}
