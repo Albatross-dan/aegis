@@ -65,3 +65,21 @@ F8, F9, F10 are logged as tracked technical debt, to be addressed opportunistica
 ---
 
 *This ADR is a living amendment. Future ADRs should reference this one where relevant rather than re-litigating settled findings.*
+
+---
+
+## 5. Remediation Log
+
+### F1 — Resolved (2026-08-20)
+
+**Root cause identified:** two compounding issues.
+1. Poll interval (5s) was far coarser than Exness demo feed's true tick rate (~0.9-1.2 ticks/sec measured empirically), so most real ticks were never sampled.
+2. A ~5-second-per-request delay was traced to Windows resolving `localhost` via IPv6 first, timing out, then falling back to IPv4 - unrelated to poll interval, but compounding the same symptom.
+
+**Fix applied:**
+- Reduced poll interval to 0.5s with change-detection (`tick.time_msc` comparison) to avoid duplicate sends.
+- Changed `BACKEND_URL` from `http://localhost:8000` to `http://127.0.0.1:8000`, eliminating the IPv6 fallback delay.
+
+**Verification:** raw tick ingestion rate increased from ~3-4 ticks/minute/symbol to 25-50+ ticks/minute/symbol. `candles_1m` `tick_count` increased correspondingly from 1-2 to 32-56 per candle. Confirmed via direct query against both `market_ticks` and `candles_1m` post-fix.
+
+**Files changed:** `C:\aegis-bridge\price_feed.py` (Windows bridge).
