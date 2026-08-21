@@ -128,15 +128,16 @@ F10 is resolved for the local development environment; any shared/production env
 
 ### F2 — In Progress (2026-08-21)
 
-**Progress applied:** Implemented a repeatable confidence-calibration audit job at `backend/app/jobs/trend_confidence_audit.py` with unit tests and operator documentation. The audit pairs each recommendation with current and horizon-forward candle closes, infers observed direction, and reports calibration by confidence decile (`accuracy` vs `avg_confidence`) plus directional-only quality metrics. CLI supports explicit model targeting (`--model-version trend_ai_v2`) and historical fallback (`--model-version trend_ai_v1` / `all`) for diagnostics.
+**Progress applied:** Implemented a repeatable confidence-calibration audit job at `backend/app/jobs/trend_confidence_audit.py` with unit tests and operator documentation. The audit pairs each recommendation with current and horizon-forward candle closes, infers observed direction, and reports calibration by confidence decile (`accuracy` vs `avg_confidence`) plus directional-only quality metrics. CLI supports explicit model targeting (`--model-version trend_ai_v2`) and historical fallback (`--model-version trend_ai_v1` / `all`) for diagnostics. Added a readiness checker at `backend/app/jobs/trend_confidence_readiness.py` and scheduled it in cron so operators can tell when `trend_ai_v2` has enough completed horizon samples to rerun the audit.
 
 **Current evidence:**
 - `trend_ai_v2` produced no paired samples yet (`total_samples=0`) because only one synchronized recommendation timestamp currently exists in DB for v2, with no forward horizon candles to score.
 - `trend_ai_v1` produced usable baseline evidence over 1006 paired samples (`overall_accuracy=0.2883`, `overall_avg_confidence=0.7660`, directional-only accuracy `0.4457` across 635 directional samples), confirming measurable overconfidence in historical behavior and validating the need for ongoing F2 calibration work.
+- The readiness checker currently reports v2 as not ready because the observed v2 history is still concentrated in a single bucket, so calibration remains blocked until more distinct buckets and completed horizon samples accumulate.
 
 **Status:** F2 remains open pending sufficient `trend_ai_v2` history accumulation and rerun of the same audit for v2-specific calibration decisions.
 
-**Files changed:** backend/app/jobs/trend_confidence_audit.py, backend/tests/test_trend_confidence_audit.py, research/F2-confidence-validation.md.
+**Files changed:** backend/app/jobs/trend_confidence_audit.py, backend/app/jobs/trend_confidence_readiness.py, backend/tests/test_trend_confidence_audit.py, backend/tests/test_trend_confidence_readiness.py, infrastructure/cron/aegis.crontab, research/F2-confidence-validation.md.
 
 ### F8 — Resolved (2026-08-21)
 

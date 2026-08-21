@@ -37,6 +37,16 @@ python -m app.jobs.trend_confidence_audit --model-version trend_ai_v2 --lookback
 python -m app.jobs.trend_confidence_audit --model-version all
 ```
 
+Readiness check:
+
+```bash
+python -m app.jobs.trend_confidence_readiness --model-version trend_ai_v2
+```
+
+This should report `ready: true` only when the v2 history has at least the configured number of distinct buckets and completed horizon samples.
+
+When scheduled via cron, the recommended log target is `backend/logs/confidence_readiness.log`.
+
 ## Output
 
 The job prints JSON with:
@@ -58,3 +68,4 @@ The job prints JSON with:
 
 - Includes all predictions for full calibration visibility and separately reports directional-only quality metrics.
 - Empty or sparse output indicates insufficient paired candle history for the chosen lookback/horizon.
+- If the readiness check is not ready, wait for more `trend_ai_v2` buckets to accumulate and re-run the same audit.

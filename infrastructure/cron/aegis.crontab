@@ -6,3 +6,6 @@
 
 # Heartbeat/alerting checks every 2 minutes
 */2 * * * * cd /home/daniel_oguda/aegis/backend && /home/daniel_oguda/aegis/backend/venv/bin/python -m app.jobs.heartbeat_check >> /home/daniel_oguda/aegis/backend/logs/heartbeat.log 2>&1
+
+# Trend AI confidence readiness check every 15 minutes
+*/15 * * * * cd /home/daniel_oguda/aegis/backend && /home/daniel_oguda/aegis/backend/venv/bin/python -m app.jobs.trend_confidence_readiness --model-version trend_ai_v2 >> /home/daniel_oguda/aegis/backend/logs/confidence_readiness.log 2>&1
