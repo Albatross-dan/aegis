@@ -40,7 +40,7 @@ This ADR does not reverse any prior architectural decision. It records identifie
 |---|---|
 | F8 | Resolved on 2026-08-21; heartbeat now classifies weekend market-closed periods and suppresses stale market-data alerts during closure windows. |
 | F9 | Resolved on 2026-08-21; ingest now rejects near-duplicate ticks using a short time window + symbol-aware price tolerance. |
-| F10 | Database credentials have appeared in plaintext in terminal history throughout development. Acceptable for solo localhost use; must be rotated and confirmed `.env`-gitignored before any shared/production use. |
+| F10 | Resolved on 2026-08-21; local database credential has been rotated, verified, and kept `.env`-gitignored. |
 
 ## 3. Decision
 
@@ -54,7 +54,7 @@ The following remediation sequence is adopted, in priority order, to be complete
 6. **F6** — Replace crontab `sleep`-based sequencing with an explicit dependency mechanism once a second scheduled job is added (candidate trigger point for adopting Prefect per Doc 08 SS9).
 7. **F2** — Defer formal validation of the confidence formula to Phase 5 (Research Laboratory / Backtesting), where it can be measured against real historical outcomes rather than adjusted speculatively.
 
-F10 remains tracked technical debt, to be addressed opportunistically or before any multi-user/production milestone (consistent with the existing deferral of auth/CI-CD/DigitalOcean deployment).
+F10 is resolved for the local development environment; any shared/production environment must still enforce credential rotation and secret management as a deployment requirement.
 
 ## 4. Consequences
 
@@ -158,6 +158,14 @@ F10 remains tracked technical debt, to be addressed opportunistically or before 
 
 **Progress applied:** Hardened local secret handling without exposing or rotating any live credential values in-repo. The backend settings loader now resolves `infrastructure/.env` from the repository root via an absolute path, making startup independent of working directory. Added `infrastructure/.env.example` as the checked-in template for local setup and `infrastructure/README.md` documenting the expected copy/rotate workflow. Repository root `.gitignore` already excludes `.env` and `.env.local`, so the remaining action item is operational rotation and verification, not code structure.
 
-**Status:** F10 remains open until local credentials are rotated and the environment is verified against the example/template workflow.
+**Status:** F10 resolved locally on 2026-08-21 after rotating the Postgres role password and verifying reconnection using the updated `infrastructure/.env` file.
 
 **Files changed:** backend/app/core/config.py, infrastructure/.env.example, infrastructure/README.md.
+
+### F10 — Resolved (2026-08-21)
+
+**Fix applied:** Rotated the local PostgreSQL role password for `aegis_admin`, updated `infrastructure/.env` to the new value, and verified the connection using the refreshed credentials. The checked-in guardrails remain in place: the repo root `.gitignore` excludes `.env`, `infrastructure/.env.example` documents the expected values, and the backend settings loader resolves the env file from the repository root.
+
+**Verification:** successful `psql` reconnection using the rotated local credential.
+
+**Files changed:** infrastructure/.env, backend/app/core/config.py, infrastructure/.env.example, infrastructure/README.md.
