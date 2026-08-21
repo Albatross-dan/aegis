@@ -93,3 +93,11 @@ F8, F9, F10 are logged as tracked technical debt, to be addressed opportunistica
 **Verification:** confirmed against live data across all 6 symbols. Genuine 5/5 directional agreement (GBPUSD buy, USDJPY sell) correctly retained confidence 1.0. All hold-direction results now show moderate confidence (0.25-0.53) rather than the pre-fix bug's near-0 or near-1 extremes.
 
 **Files changed:** backend/app/ai_council/trend_ai.py.
+
+### F4 — Resolved (2026-08-20)
+
+**Fix applied:** Replaced static, hardcoded price bounds in SYMBOL_CONFIG with a dynamic function get_dynamic_price_bounds() that queries market_ticks for each symbol's real bid history over the last 30 days, computing bounds as [min(bid) * 0.85, max(bid) * 1.15]. Falls back to static bounds if fewer than 100 historical ticks exist for a symbol (e.g. newly added symbols with no history yet). check_price_sanity now requires a db session parameter to support this query. Spread bounds (max_spread) remain static in SYMBOL_CONFIG, as spread is a different class of check (transient anomaly detection) not suited to historical adaptation.
+
+**Verification:** confirmed against live data. EURUSD dynamic bounds computed as 0.92225-1.34473 from observed range 1.085-1.16933. USDJPY dynamic bounds computed as 134.77-183.618 from observed range 158.553-159.668. Both ranges are sane - wide enough to absorb real market movement, but still bounded enough to catch obviously bad prices.
+
+**Files changed:** backend/app/core/validation.py, backend/app/main.py, backend/tests/test_validation.py.
