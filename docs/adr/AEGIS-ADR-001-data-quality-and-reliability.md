@@ -153,3 +153,11 @@ F10 remains tracked technical debt, to be addressed opportunistically or before 
 **Verification:** dedicated unit tests cover true positive and boundary negatives (time-window exceed and tolerance exceed). Full backend suite passes with the new tests included.
 
 **Files changed:** backend/app/main.py, backend/tests/test_tick_dedup.py.
+
+### F10 — In Progress (2026-08-21)
+
+**Progress applied:** Hardened local secret handling without exposing or rotating any live credential values in-repo. The backend settings loader now resolves `infrastructure/.env` from the repository root via an absolute path, making startup independent of working directory. Added `infrastructure/.env.example` as the checked-in template for local setup and `infrastructure/README.md` documenting the expected copy/rotate workflow. Repository root `.gitignore` already excludes `.env` and `.env.local`, so the remaining action item is operational rotation and verification, not code structure.
+
+**Status:** F10 remains open until local credentials are rotated and the environment is verified against the example/template workflow.
+
+**Files changed:** backend/app/core/config.py, infrastructure/.env.example, infrastructure/README.md.

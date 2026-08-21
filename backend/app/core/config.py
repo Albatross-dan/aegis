@@ -1,4 +1,10 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+INFRA_ENV_FILE = REPO_ROOT / "infrastructure" / ".env"
 
 class Settings(BaseSettings):
     postgres_user: str
@@ -15,6 +21,6 @@ class Settings(BaseSettings):
         )
 
     class Config:
-        env_file = "../infrastructure/.env"
+        env_file = str(INFRA_ENV_FILE)
 
 settings = Settings()
