@@ -83,3 +83,13 @@ F8, F9, F10 are logged as tracked technical debt, to be addressed opportunistica
 **Verification:** raw tick ingestion rate increased from ~3-4 ticks/minute/symbol to 25-50+ ticks/minute/symbol. `candles_1m` `tick_count` increased correspondingly from 1-2 to 32-56 per candle. Confirmed via direct query against both `market_ticks` and `candles_1m` post-fix.
 
 **Files changed:** `C:\aegis-bridge\price_feed.py` (Windows bridge).
+
+### F3 — Resolved (2026-08-20)
+
+**Fix applied:** Trend Intelligence AI (`trend_ai.py`) now requires multi-candle confirmation instead of reasoning from a single latest candle. Fetches the last 5 candles, classifies each individually (buy/sell/hold based on close vs EMA20 vs SMA20 structure), and only assigns a directional call if at least 4 of 5 candles agree. Confidence blends persistence (agreement toward the winning direction, 60% weight) with magnitude (price divergence from SMA relative to ATR, 40% weight). Model version bumped to trend_ai_v2 per Doc 02 §9.
+
+**Bug found and fixed during implementation:** initial version calculated persistence using hold_count when no direction reached threshold, producing near-certain confidence (~0.99) for a "no signal" result — backwards, since hold should never carry high confidence. Corrected to use max(buy_count, sell_count) / window_size regardless of final direction, so hold results correctly show moderate confidence reflecting how close the market came to a real signal, not false certainty in the absence of one.
+
+**Verification:** confirmed against live data across all 6 symbols. Genuine 5/5 directional agreement (GBPUSD buy, USDJPY sell) correctly retained confidence 1.0. All hold-direction results now show moderate confidence (0.25-0.53) rather than the pre-fix bug's near-0 or near-1 extremes.
+
+**Files changed:** backend/app/ai_council/trend_ai.py.
