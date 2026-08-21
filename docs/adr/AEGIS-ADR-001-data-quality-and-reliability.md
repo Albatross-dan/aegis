@@ -101,3 +101,19 @@ F8, F9, F10 are logged as tracked technical debt, to be addressed opportunistica
 **Verification:** confirmed against live data. EURUSD dynamic bounds computed as 0.92225-1.34473 from observed range 1.085-1.16933. USDJPY dynamic bounds computed as 134.77-183.618 from observed range 158.553-159.668. Both ranges are sane - wide enough to absorb real market movement, but still bounded enough to catch obviously bad prices.
 
 **Files changed:** backend/app/core/validation.py, backend/app/main.py, backend/tests/test_validation.py.
+
+### F5 — Resolved (2026-08-21)
+
+**Fix applied:** Added a minimal heartbeat/alerting mechanism via `backend/app/jobs/heartbeat_check.py`. Every run checks: (1) latest `market_ticks` timestamp per symbol (2-minute threshold), (2) latest `technical_features.computed_at` per symbol (3-minute threshold), (3) latest `ai_recommendations.computed_at` for `trend_ai` per symbol (3-minute threshold), and (4) backend health endpoint (`http://127.0.0.1:8000/health`, 3-second timeout). Unhealthy checks emit log lines prefixed with literal `ALERT:` for reliable grep/monitoring; healthy checks emit INFO lines. The script exits non-zero when any alert is present. Cron schedule added to run every 2 minutes and append to `logs/heartbeat.log`.
+
+**Verification:** heartbeat test suite added and passed (mocked DB + HTTP). Live run correctly detected real downtime conditions (stale ticks + backend health refusal) while simultaneously confirming fresh feature/trend pipelines, demonstrating alerting now works for both failures and healthy subsystems.
+
+**Files changed:** backend/app/jobs/heartbeat_check.py, backend/tests/test_heartbeat_check.py.
+
+### F7 — Resolved (2026-08-21)
+
+**Fix applied:** Introduced a baseline Pytest suite covering the designated critical modules before further layering: validation checks in `validation.py` and indicator computation in `compute_features.py`. Added test discovery config and path bootstrap for clean backend-local test execution. Validation tests cover missing fields, timestamp sanity, price/spread sanity, and fail-fast behavior. Feature tests cover SMA/EMA availability windows plus RSI/ATR sanity bounds using synthetic in-memory data.
+
+**Verification:** full backend test suite passes with verbose execution, including the new baseline tests and subsequent heartbeat tests.
+
+**Files changed:** backend/tests/test_validation.py, backend/tests/test_compute_features.py, backend/tests/conftest.py, backend/pytest.ini, backend/requirements.txt, backend/app/jobs/compute_features.py.
