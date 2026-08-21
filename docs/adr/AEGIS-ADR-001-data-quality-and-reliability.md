@@ -38,7 +38,7 @@ This ADR does not reverse any prior architectural decision. It records identifie
 
 | # | Finding |
 |---|---|
-| F8 | No explicit handling for market-closed periods (weekends); indistinguishable from a feed outage under current staleness logic. |
+| F8 | Resolved on 2026-08-21; heartbeat now classifies weekend market-closed periods and suppresses stale market-data alerts during closure windows. |
 | F9 | Duplicate detection catches only exact repeats, not near-duplicate anomalies. |
 | F10 | Database credentials have appeared in plaintext in terminal history throughout development. Acceptable for solo localhost use; must be rotated and confirmed `.env`-gitignored before any shared/production use. |
 
@@ -54,7 +54,7 @@ The following remediation sequence is adopted, in priority order, to be complete
 6. **F6** — Replace crontab `sleep`-based sequencing with an explicit dependency mechanism once a second scheduled job is added (candidate trigger point for adopting Prefect per Doc 08 SS9).
 7. **F2** — Defer formal validation of the confidence formula to Phase 5 (Research Laboratory / Backtesting), where it can be measured against real historical outcomes rather than adjusted speculatively.
 
-F8, F9, F10 are logged as tracked technical debt, to be addressed opportunistically or before any multi-user/production milestone (consistent with the existing deferral of auth/CI-CD/DigitalOcean deployment).
+F9 and F10 remain tracked technical debt, to be addressed opportunistically or before any multi-user/production milestone (consistent with the existing deferral of auth/CI-CD/DigitalOcean deployment).
 
 ## 4. Consequences
 
@@ -137,3 +137,11 @@ F8, F9, F10 are logged as tracked technical debt, to be addressed opportunistica
 **Status:** F2 remains open pending sufficient `trend_ai_v2` history accumulation and rerun of the same audit for v2-specific calibration decisions.
 
 **Files changed:** backend/app/jobs/trend_confidence_audit.py, backend/tests/test_trend_confidence_audit.py, research/F2-confidence-validation.md.
+
+### F8 — Resolved (2026-08-21)
+
+**Fix applied:** Added explicit forex market-closed handling to heartbeat logic (`backend/app/jobs/heartbeat_check.py`). During the weekend closure window (Friday 21:00 UTC to Sunday 21:00 UTC), stale age checks for `market_ticks`, `technical_features`, and `ai_recommendations` are logged as informational "expected stale (market closed)" messages instead of `ALERT:` failures. This distinguishes normal market inactivity from real feed/process outages while preserving backend availability checks as hard alerts.
+
+**Verification:** heartbeat tests now include weekend scenarios. Confirmed stale data does not raise alerts when market is closed, and backend failures still raise `ALERT:` and non-zero alert count.
+
+**Files changed:** backend/app/jobs/heartbeat_check.py, backend/tests/test_heartbeat_check.py.

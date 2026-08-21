@@ -57,3 +57,40 @@ def test_heartbeat_backend_unhealthy_triggers_alert(monkeypatch, caplog):
 
     assert alerts == 1
     assert any(record.message.startswith("ALERT: [backend]") for record in caplog.records)
+
+
+def test_heartbeat_market_closed_suppresses_stale_data_alerts(monkeypatch, caplog):
+    now = datetime(2026, 8, 22, 12, 0, tzinfo=timezone.utc)  # Saturday
+    stale = now - timedelta(minutes=10)
+
+    monkeypatch.setattr(heartbeat_check, "get_latest_tick_timestamp", lambda _db, _symbol: stale)
+    monkeypatch.setattr(heartbeat_check, "get_latest_feature_timestamp", lambda _db, _symbol: stale)
+    monkeypatch.setattr(heartbeat_check, "get_latest_trend_timestamp", lambda _db, _symbol: stale)
+
+    caplog.set_level(logging.INFO, logger="aegis")
+    alerts = heartbeat_check.run(db_session=object(), now=now, health_check_fn=lambda: (True, "healthy"))
+
+    assert alerts == 0
+    assert any("market is closed" in record.message for record in caplog.records)
+    assert not any(record.message.startswith("ALERT: [market_ticks]") for record in caplog.records)
+    assert not any(record.message.startswith("ALERT: [technical_features]") for record in caplog.records)
+    assert not any(record.message.startswith("ALERT: [ai_recommendations]") for record in caplog.records)
+
+
+def test_heartbeat_market_closed_still_alerts_on_backend_failure(monkeypatch, caplog):
+    now = datetime(2026, 8, 22, 12, 0, tzinfo=timezone.utc)  # Saturday
+    stale = now - timedelta(minutes=10)
+
+    monkeypatch.setattr(heartbeat_check, "get_latest_tick_timestamp", lambda _db, _symbol: stale)
+    monkeypatch.setattr(heartbeat_check, "get_latest_feature_timestamp", lambda _db, _symbol: stale)
+    monkeypatch.setattr(heartbeat_check, "get_latest_trend_timestamp", lambda _db, _symbol: stale)
+
+    caplog.set_level(logging.INFO, logger="aegis")
+    alerts = heartbeat_check.run(
+        db_session=object(),
+        now=now,
+        health_check_fn=lambda: (False, "backend health check failed: connection refused"),
+    )
+
+    assert alerts == 1
+    assert any(record.message.startswith("ALERT: [backend]") for record in caplog.records)
