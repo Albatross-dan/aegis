@@ -1,0 +1,8 @@
+# AEGIS scheduled jobs (explicit dependency sequencing)
+# Apply with: crontab infrastructure/cron/aegis.crontab
+
+# Run feature computation and Trend AI in one explicit pipeline (replaces sleep-based sequencing)
+* * * * * cd /home/daniel_oguda/aegis/backend && /home/daniel_oguda/aegis/backend/venv/bin/python -m app.jobs.feature_trend_pipeline >> /home/daniel_oguda/aegis/backend/logs/pipeline_cron.log 2>&1
+
+# Heartbeat/alerting checks every 2 minutes
+*/2 * * * * cd /home/daniel_oguda/aegis/backend && /home/daniel_oguda/aegis/backend/venv/bin/python -m app.jobs.heartbeat_check >> /home/daniel_oguda/aegis/backend/logs/heartbeat.log 2>&1

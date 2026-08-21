@@ -117,3 +117,11 @@ F8, F9, F10 are logged as tracked technical debt, to be addressed opportunistica
 **Verification:** full backend test suite passes with verbose execution, including the new baseline tests and subsequent heartbeat tests.
 
 **Files changed:** backend/tests/test_validation.py, backend/tests/test_compute_features.py, backend/tests/conftest.py, backend/pytest.ini, backend/requirements.txt, backend/app/jobs/compute_features.py.
+
+### F6 — Resolved (2026-08-21)
+
+**Fix applied:** Replaced crontab sleep-based sequencing (`compute_features` every minute + `trend_ai` with `sleep 15`) with an explicit dependency pipeline implemented in `backend/app/jobs/feature_trend_pipeline.py`. The pipeline runs feature computation first, then trend computation, and exits non-zero on failure while logging `ALERT:` for operational visibility. Added unit tests to assert strict execution order and fail-fast behavior (trend does not run if features fail). Updated the active system crontab to run only the pipeline every minute, and added a version-controlled cron spec at `infrastructure/cron/aegis.crontab`.
+
+**Verification:** full backend test suite passes with the new pipeline tests included. Manual pipeline run confirms ordered execution and successful completion logs for feature then trend stages.
+
+**Files changed:** backend/app/jobs/feature_trend_pipeline.py, backend/tests/test_feature_trend_pipeline.py, infrastructure/cron/aegis.crontab.
