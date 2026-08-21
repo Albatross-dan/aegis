@@ -125,3 +125,15 @@ F8, F9, F10 are logged as tracked technical debt, to be addressed opportunistica
 **Verification:** full backend test suite passes with the new pipeline tests included. Manual pipeline run confirms ordered execution and successful completion logs for feature then trend stages.
 
 **Files changed:** backend/app/jobs/feature_trend_pipeline.py, backend/tests/test_feature_trend_pipeline.py, infrastructure/cron/aegis.crontab.
+
+### F2 — In Progress (2026-08-21)
+
+**Progress applied:** Implemented a repeatable confidence-calibration audit job at `backend/app/jobs/trend_confidence_audit.py` with unit tests and operator documentation. The audit pairs each recommendation with current and horizon-forward candle closes, infers observed direction, and reports calibration by confidence decile (`accuracy` vs `avg_confidence`) plus directional-only quality metrics. CLI supports explicit model targeting (`--model-version trend_ai_v2`) and historical fallback (`--model-version trend_ai_v1` / `all`) for diagnostics.
+
+**Current evidence:**
+- `trend_ai_v2` produced no paired samples yet (`total_samples=0`) because only one synchronized recommendation timestamp currently exists in DB for v2, with no forward horizon candles to score.
+- `trend_ai_v1` produced usable baseline evidence over 1006 paired samples (`overall_accuracy=0.2883`, `overall_avg_confidence=0.7660`, directional-only accuracy `0.4457` across 635 directional samples), confirming measurable overconfidence in historical behavior and validating the need for ongoing F2 calibration work.
+
+**Status:** F2 remains open pending sufficient `trend_ai_v2` history accumulation and rerun of the same audit for v2-specific calibration decisions.
+
+**Files changed:** backend/app/jobs/trend_confidence_audit.py, backend/tests/test_trend_confidence_audit.py, research/F2-confidence-validation.md.
