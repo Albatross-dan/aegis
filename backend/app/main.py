@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from dataclasses import dataclass
 
 from fastapi import FastAPI, Depends, status, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +8,7 @@ from sqlalchemy import text
 
 from app.db.session import get_db
 from app.core.logging_config import logger
-from app.core.validation import validate_tick
+from app.core.validation import validate_tick, SYMBOL_CONFIG
 from app.models.schemas import TickIn
 from app.models.market_data import MarketTick, RejectedTick
 
@@ -24,6 +25,49 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+NEAR_DUPLICATE_WINDOW_SECONDS = 2
+NEAR_DUPLICATE_TOLERANCE_RATIO = 0.02
+
+
+@dataclass
+class NearDuplicateConfig:
+    window_seconds: int
+    price_tolerance: float
+
+
+def _near_duplicate_config(symbol: str) -> NearDuplicateConfig:
+    symbol_config = SYMBOL_CONFIG.get(symbol)
+    max_spread = symbol_config[2] if symbol_config else 0.0010
+    tolerance = max(max_spread * NEAR_DUPLICATE_TOLERANCE_RATIO, 0.000001)
+    return NearDuplicateConfig(
+        window_seconds=NEAR_DUPLICATE_WINDOW_SECONDS,
+        price_tolerance=tolerance,
+    )
+
+
+def _is_near_duplicate_tick(latest_tick: MarketTick, incoming_tick: TickIn) -> bool:
+    if latest_tick is None:
+        return False
+
+    config = _near_duplicate_config(incoming_tick.symbol)
+    latest_ts = latest_tick.timestamp
+    incoming_ts = incoming_tick.timestamp
+
+    if latest_ts.tzinfo is None:
+        latest_ts = latest_ts.replace(tzinfo=timezone.utc)
+    if incoming_ts.tzinfo is None:
+        incoming_ts = incoming_ts.replace(tzinfo=timezone.utc)
+
+    seconds_delta = abs((incoming_ts - latest_ts).total_seconds())
+    if seconds_delta > config.window_seconds:
+        return False
+
+    return (
+        abs(incoming_tick.bid - latest_tick.bid) <= config.price_tolerance
+        and abs(incoming_tick.ask - latest_tick.ask) <= config.price_tolerance
+    )
 
 
 @app.on_event("startup")
@@ -97,6 +141,20 @@ def ingest_tick(tick: TickIn, response: Response, db: Session = Depends(get_db))
         _quarantine_tick(db, tick, "duplicate tick")
         response.status_code = status.HTTP_202_ACCEPTED
         return {"status": "rejected", "symbol": tick.symbol, "reason": "duplicate tick"}
+
+    latest_symbol_tick = (
+        db.query(MarketTick)
+        .filter(
+            MarketTick.symbol == tick.symbol,
+            MarketTick.source == tick.source,
+        )
+        .order_by(MarketTick.timestamp.desc())
+        .first()
+    )
+    if _is_near_duplicate_tick(latest_symbol_tick, tick):
+        _quarantine_tick(db, tick, "near-duplicate tick")
+        response.status_code = status.HTTP_202_ACCEPTED
+        return {"status": "rejected", "symbol": tick.symbol, "reason": "near-duplicate tick"}
 
     db_tick = MarketTick(
         symbol=tick.symbol,

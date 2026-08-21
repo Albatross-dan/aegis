@@ -39,7 +39,7 @@ This ADR does not reverse any prior architectural decision. It records identifie
 | # | Finding |
 |---|---|
 | F8 | Resolved on 2026-08-21; heartbeat now classifies weekend market-closed periods and suppresses stale market-data alerts during closure windows. |
-| F9 | Duplicate detection catches only exact repeats, not near-duplicate anomalies. |
+| F9 | Resolved on 2026-08-21; ingest now rejects near-duplicate ticks using a short time window + symbol-aware price tolerance. |
 | F10 | Database credentials have appeared in plaintext in terminal history throughout development. Acceptable for solo localhost use; must be rotated and confirmed `.env`-gitignored before any shared/production use. |
 
 ## 3. Decision
@@ -54,7 +54,7 @@ The following remediation sequence is adopted, in priority order, to be complete
 6. **F6** — Replace crontab `sleep`-based sequencing with an explicit dependency mechanism once a second scheduled job is added (candidate trigger point for adopting Prefect per Doc 08 SS9).
 7. **F2** — Defer formal validation of the confidence formula to Phase 5 (Research Laboratory / Backtesting), where it can be measured against real historical outcomes rather than adjusted speculatively.
 
-F9 and F10 remain tracked technical debt, to be addressed opportunistically or before any multi-user/production milestone (consistent with the existing deferral of auth/CI-CD/DigitalOcean deployment).
+F10 remains tracked technical debt, to be addressed opportunistically or before any multi-user/production milestone (consistent with the existing deferral of auth/CI-CD/DigitalOcean deployment).
 
 ## 4. Consequences
 
@@ -145,3 +145,11 @@ F9 and F10 remain tracked technical debt, to be addressed opportunistically or b
 **Verification:** heartbeat tests now include weekend scenarios. Confirmed stale data does not raise alerts when market is closed, and backend failures still raise `ALERT:` and non-zero alert count.
 
 **Files changed:** backend/app/jobs/heartbeat_check.py, backend/tests/test_heartbeat_check.py.
+
+### F9 — Resolved (2026-08-21)
+
+**Fix applied:** Extended tick ingest deduplication beyond exact matches by adding a near-duplicate gate in `backend/app/main.py`. After exact duplicate filtering, ingest now compares each incoming tick with the latest stored tick for the same symbol/source and rejects as `near-duplicate tick` when both conditions hold: (1) timestamp delta is within a short 2-second window, and (2) bid/ask deltas are within a symbol-aware tolerance derived from max spread (`max_spread * 0.02`, with minimum epsilon floor). This catches jittered repeats that previously bypassed exact-match duplicate detection.
+
+**Verification:** dedicated unit tests cover true positive and boundary negatives (time-window exceed and tolerance exceed). Full backend suite passes with the new tests included.
+
+**Files changed:** backend/app/main.py, backend/tests/test_tick_dedup.py.
