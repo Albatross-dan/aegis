@@ -1,6 +1,9 @@
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from app.models.schemas import TickIn
 
 # --- Configurable thresholds (Doc 06 SS4) ---
@@ -8,8 +11,9 @@ from app.models.schemas import TickIn
 MAX_FUTURE_SKEW_SECONDS = 5
 MAX_STALENESS_SECONDS = 60
 
-# Per-symbol config: (min_price, max_price, max_spread)
-# Bounds are intentionally wide historical sanity ranges, not tight trading signals.
+# Per-symbol config: (fallback_min_price, fallback_max_price, max_spread)
+# The price bounds are only fallback safety nets; dynamic ranges are derived from
+# live historical market_ticks data.
 SYMBOL_CONFIG = {
     "EURUSD": (0.90, 1.30, 0.0010),
     "GBPUSD": (1.05, 1.45, 0.0015),
@@ -18,6 +22,41 @@ SYMBOL_CONFIG = {
     "AUDUSD": (0.55, 0.80, 0.0015),
     "USDCAD": (1.20, 1.50, 0.0015),
 }
+
+MIN_HISTORY_TICKS = 100
+HISTORY_LOOKBACK_DAYS = 30
+
+
+def get_dynamic_price_bounds(symbol: str, db_session: Session) -> tuple[float, float]:
+    fallback = SYMBOL_CONFIG.get(symbol)
+    if fallback is None:
+        raise ValueError(f"Unsupported symbol: {symbol}")
+
+    fallback_low, fallback_high, _ = fallback
+    if db_session is None:
+        return fallback_low, fallback_high
+
+    result = db_session.execute(
+        text("""
+            SELECT
+                COUNT(*) AS tick_count,
+                MIN(bid) AS min_bid,
+                MAX(bid) AS max_bid
+            FROM market_ticks
+            WHERE symbol = :symbol
+              AND timestamp >= NOW() - (:lookback_days || ' days')::interval
+        """),
+        {"symbol": symbol, "lookback_days": HISTORY_LOOKBACK_DAYS},
+    )
+    row = result.mappings().one()
+    tick_count = row["tick_count"] or 0
+    min_bid = row["min_bid"]
+    max_bid = row["max_bid"]
+
+    if tick_count < MIN_HISTORY_TICKS or min_bid is None or max_bid is None:
+        return fallback_low, fallback_high
+
+    return min_bid * 0.85, max_bid * 1.15
 
 
 def check_missing_fields(tick: TickIn) -> tuple[bool, Optional[str]]:
@@ -43,17 +82,15 @@ def check_timestamp_sanity(tick: TickIn) -> tuple[bool, Optional[str]]:
     return True, None
 
 
-def check_price_sanity(tick: TickIn) -> tuple[bool, Optional[str]]:
+def check_price_sanity(tick: TickIn, db_session: Session) -> tuple[bool, Optional[str]]:
     if tick.bid <= 0 or tick.ask <= 0:
         return False, "non-positive bid/ask"
     if tick.ask < tick.bid:
         return False, "crossed market (ask < bid)"
 
-    config = SYMBOL_CONFIG.get(tick.symbol)
-    if config:
-        low, high, _ = config
-        if not (low <= tick.bid <= high) or not (low <= tick.ask <= high):
-            return False, f"price out of expected range [{low}, {high}] for {tick.symbol}"
+    low, high = get_dynamic_price_bounds(tick.symbol, db_session)
+    if not (low <= tick.bid <= high) or not (low <= tick.ask <= high):
+        return False, f"price out of expected range [{low}, {high}] for {tick.symbol}"
     return True, None
 
 
@@ -77,10 +114,13 @@ VALIDATION_CHECKS = [
 ]
 
 
-def validate_tick(tick: TickIn) -> tuple[bool, Optional[str]]:
+def validate_tick(tick: TickIn, db_session: Session) -> tuple[bool, Optional[str]]:
     """Run all validation checks in order. Returns (is_valid, reason)."""
     for check in VALIDATION_CHECKS:
-        is_valid, reason = check(tick)
+        if check is check_price_sanity:
+            is_valid, reason = check(tick, db_session)
+        else:
+            is_valid, reason = check(tick)
         if not is_valid:
             return False, reason
     return True, None

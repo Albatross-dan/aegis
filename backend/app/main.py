@@ -75,7 +75,7 @@ def _quarantine_tick(db: Session, tick: TickIn, reason: str):
 @app.post("/api/v1/ticks")
 def ingest_tick(tick: TickIn, response: Response, db: Session = Depends(get_db)):
     # Stage Two validation (Doc 06 SS4)
-    is_valid, reason = validate_tick(tick)
+    is_valid, reason = validate_tick(tick, db)
     if not is_valid:
         _quarantine_tick(db, tick, reason)
         response.status_code = status.HTTP_202_ACCEPTED
