@@ -22,8 +22,11 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+from app.core.config import settings
 from app.db.session import Base
 from app.models.market_data import MarketTick
+
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 target_metadata = Base.metadata
 

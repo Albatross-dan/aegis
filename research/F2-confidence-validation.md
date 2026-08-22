@@ -6,25 +6,14 @@ This document defines the baseline, repeatable confidence audit for `trend_ai_v2
 
 Validate whether reported confidence aligns with realized directional accuracy over historical data.
 
-## Method
-
-For each recommendation (`buy`/`sell`/`hold`) from `ai_recommendations`:
-
-1. Pair recommendation bucket with the current `candles_1m.close`.
-2. Pair again with `candles_1m.close` at `bucket + horizon_minutes` (default 3).
 3. Infer observed direction:
    - `buy` if `future_close > now_close`
    - `sell` if `future_close < now_close`
-   - `hold` if unchanged
-4. Score recommendation as correct when `predicted_direction == observed_direction`.
-5. Aggregate by confidence deciles (`0.0-0.1`, ..., `0.9-1.0`) and compare:
    - `accuracy` per decile
    - `avg_confidence` per decile
    - directional subset quality (`buy`/`sell` only): `directional_sample_size`, `directional_accuracy`
 
-## Run
-
-From `backend/` with venv active:
+Use [docs/ops/phase5-research-registry.md](../docs/ops/phase5-research-registry.md) to store the readiness snapshot or later backtest runs.
 
 ```bash
 python -m app.jobs.trend_confidence_audit
