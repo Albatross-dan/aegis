@@ -36,3 +36,32 @@ def test_assess_readiness_ready_when_thresholds_met():
 
     assert readiness["ready"] is True
     assert readiness["reasons"] == []
+
+
+def test_run_reports_deferred_when_market_is_closed(monkeypatch):
+    monkeypatch.setattr(trend_confidence_readiness, "is_forex_market_closed", lambda _now: True)
+
+    class FakeDb:
+        def execute(self, *_args, **_kwargs):
+            class Result:
+                def mappings(self):
+                    class Mappings:
+                        def one(self):
+                            return {
+                                "total_recommendations": 6,
+                                "unique_buckets": 1,
+                                "latest_recommendation_bucket": None,
+                                "earliest_recommendation_bucket": None,
+                                "latest_candle_bucket": None,
+                                "completed_samples": 0,
+                            }
+                    return Mappings()
+            return Result()
+
+        def close(self):
+            pass
+
+    report = trend_confidence_readiness.run(db_session=FakeDb(), model_version="trend_ai_v2")
+
+    assert report["market_closed"] is True
+    assert report["readiness"]["ready"] is False

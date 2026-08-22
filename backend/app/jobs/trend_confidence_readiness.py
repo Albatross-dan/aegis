@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.logging_config import logger
 from app.db.session import SessionLocal
+from app.jobs.heartbeat_check import is_forex_market_closed
 
 EXPERT_NAME = "trend_ai"
 DEFAULT_MODEL_VERSION = "trend_ai_v2"
@@ -105,6 +106,7 @@ def run(
 ) -> dict:
     db = db_session or SessionLocal()
     owns_session = db_session is None
+    market_closed = is_forex_market_closed(datetime.now(timezone.utc))
 
     try:
         metrics = fetch_readiness_metrics(
@@ -129,11 +131,14 @@ def run(
             "min_completed_samples": min_completed_samples,
             "min_unique_buckets": min_unique_buckets,
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "market_closed": market_closed,
             "metrics": serialized_metrics,
             "readiness": readiness,
         }
 
-        if readiness["ready"]:
+        if market_closed:
+            logger.info("[confidence_readiness] deferred: forex market is closed")
+        elif readiness["ready"]:
             logger.info(
                 "[confidence_readiness] ready=%s completed_samples=%s unique_buckets=%s",
                 readiness["ready"],
